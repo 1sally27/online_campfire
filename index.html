@@ -699,6 +699,33 @@
       }
     }
 
+
+    .sound-button {
+      position: absolute;
+      top: 154px;
+      right: 24px;
+      z-index: 31;
+      border: 1px solid var(--panel-border);
+      border-radius: 14px;
+      padding: 10px 14px;
+      color: var(--text);
+      background: var(--panel);
+      backdrop-filter: blur(14px);
+      box-shadow: 0 10px 26px rgba(0,0,0,.2);
+      cursor: pointer;
+      font-weight: 700;
+      transition: transform .2s ease, background .2s ease;
+    }
+
+    .sound-button:hover {
+      transform: translateY(-1px);
+      background: rgba(25, 31, 43, .84);
+    }
+
+    .sound-button:active {
+      transform: translateY(1px);
+    }
+
     @media (max-width: 720px) {
       html,
       body {
@@ -768,6 +795,13 @@
         top: 20vh;
         right: 7vw;
         width: 58px;
+      }
+
+      .sound-button {
+        top: 154px;
+        right: 12px;
+        padding: 8px 11px;
+        font-size: 12px;
       }
 
       .campfire-wrap {
@@ -910,6 +944,15 @@
       <div class="subtitle" id="locationStatus">위치 권한을 허용해 주세요.</div>
     </aside>
 
+    <button class="sound-button" id="soundButton" type="button">🔊 소리 켜기</button>
+
+    <audio id="campfireAudio" loop preload="auto">
+      <source src="dragon-studio-campfire-in-the-woods-467491.mp3" type="audio/mpeg" />
+    </audio>
+    <audio id="cricketsAudio" loop preload="auto">
+      <source src="freesound_community-crickets-26444.mp3" type="audio/mpeg" />
+    </audio>
+
     <div class="toast" id="toast">장작을 넣었습니다.</div>
 
     <div class="ground-shadow"></div>
@@ -975,6 +1018,9 @@
     const sendButton = document.getElementById("sendButton");
     const speechLayer = document.getElementById("speechLayer");
     const toast = document.getElementById("toast");
+    const soundButton = document.getElementById("soundButton");
+    const campfireAudio = document.getElementById("campfireAudio");
+    const cricketsAudio = document.getElementById("cricketsAudio");
 
     const state = {
       wood: Number(localStorage.getItem("campfireWood") || 1),
@@ -995,6 +1041,41 @@
       "아무 말 없이 있다 갈게요",
       "퇴근까지 조금만 더"
     ];
+
+    let soundEnabled = false;
+
+    campfireAudio.volume = 0.58;
+    cricketsAudio.volume = 0.22;
+
+    async function enableAmbientSound() {
+      try {
+        campfireAudio.currentTime = 0;
+        cricketsAudio.currentTime = 0;
+        await Promise.all([campfireAudio.play(), cricketsAudio.play()]);
+        soundEnabled = true;
+        soundButton.textContent = "🔇 소리 끄기";
+        localStorage.setItem("campfireSoundEnabled", "true");
+      } catch (error) {
+        console.error("오디오 재생 실패:", error);
+        showToast("브라우저에서 소리를 재생하지 못했습니다.");
+      }
+    }
+
+    function disableAmbientSound() {
+      campfireAudio.pause();
+      cricketsAudio.pause();
+      soundEnabled = false;
+      soundButton.textContent = "🔊 소리 켜기";
+      localStorage.setItem("campfireSoundEnabled", "false");
+    }
+
+    function toggleAmbientSound() {
+      if (soundEnabled) {
+        disableAmbientSound();
+      } else {
+        enableAmbientSound();
+      }
+    }
 
     function createStars() {
       const count = 58;
@@ -1292,6 +1373,7 @@
     }
 
     logButton.addEventListener("click", () => addWood(true));
+    soundButton.addEventListener("click", toggleAmbientSound);
     marshmallowButton.addEventListener("click", roastMarshmallow);
     sendButton.addEventListener("click", sendMessage);
     chatInput.addEventListener("keydown", event => {
