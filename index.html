@@ -704,7 +704,10 @@
       position: absolute;
       top: 154px;
       right: 24px;
-      z-index: 31;
+      z-index: 60;
+      pointer-events: auto;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
       border: 1px solid var(--panel-border);
       border-radius: 14px;
       padding: 10px 14px;
@@ -798,10 +801,12 @@
       }
 
       .sound-button {
-        top: 154px;
+        top: auto;
         right: 12px;
-        padding: 8px 11px;
+        bottom: calc(max(10px, env(safe-area-inset-bottom)) + 154px);
+        padding: 9px 12px;
         font-size: 12px;
+        border-radius: 13px;
       }
 
       .campfire-wrap {
@@ -915,6 +920,10 @@
         padding: 8px;
       }
 
+      .sound-button {
+        bottom: calc(max(8px, env(safe-area-inset-bottom)) + 136px);
+      }
+
       .log-button,
       .chat-input,
       .send-button {
@@ -951,6 +960,12 @@
     </audio>
     <audio id="cricketsAudio" loop preload="auto">
       <source src="freesound_community-crickets-26444.mp3" type="audio/mpeg" />
+    </audio>
+    <audio id="woodThrowAudio" preload="auto">
+      <source src="freesound_community-punch-boxing-02wav-14897.mp3" type="audio/mpeg" />
+    </audio>
+    <audio id="sizzleAudio" preload="auto">
+      <source src="freesound_community-sizzle-104894.mp3" type="audio/mpeg" />
     </audio>
 
     <div class="toast" id="toast">장작을 넣었습니다.</div>
@@ -1021,6 +1036,8 @@
     const soundButton = document.getElementById("soundButton");
     const campfireAudio = document.getElementById("campfireAudio");
     const cricketsAudio = document.getElementById("cricketsAudio");
+    const woodThrowAudio = document.getElementById("woodThrowAudio");
+    const sizzleAudio = document.getElementById("sizzleAudio");
 
     const state = {
       wood: Number(localStorage.getItem("campfireWood") || 1),
@@ -1046,24 +1063,53 @@
 
     campfireAudio.volume = 0.58;
     cricketsAudio.volume = 0.22;
+    woodThrowAudio.volume = 0.62;
+    sizzleAudio.volume = 0.42;
 
     async function enableAmbientSound() {
+      soundButton.disabled = true;
+      soundButton.textContent = "🔊 소리 불러오는 중";
+
       try {
         campfireAudio.currentTime = 0;
         cricketsAudio.currentTime = 0;
-        await Promise.all([campfireAudio.play(), cricketsAudio.play()]);
+
+        const results = await Promise.allSettled([
+          campfireAudio.play(),
+          cricketsAudio.play()
+        ]);
+
+        const playedCount = results.filter(result => result.status === "fulfilled").length;
+
+        if (playedCount === 0) {
+          throw new Error("두 오디오 파일 모두 재생하지 못했습니다.");
+        }
+
         soundEnabled = true;
         soundButton.textContent = "🔇 소리 끄기";
         localStorage.setItem("campfireSoundEnabled", "true");
+
+        if (playedCount === 1) {
+          showToast("음원 하나를 불러오지 못했습니다. GitHub에 mp3 두 개가 모두 있는지 확인해 주세요.");
+        }
       } catch (error) {
         console.error("오디오 재생 실패:", error);
-        showToast("브라우저에서 소리를 재생하지 못했습니다.");
+        campfireAudio.pause();
+        cricketsAudio.pause();
+        soundEnabled = false;
+        soundButton.textContent = "🔊 소리 켜기";
+        showToast("음원을 찾지 못했습니다. index.html과 mp3 두 파일을 같은 폴더에 올려 주세요.");
+      } finally {
+        soundButton.disabled = false;
       }
     }
 
     function disableAmbientSound() {
       campfireAudio.pause();
       cricketsAudio.pause();
+      woodThrowAudio.pause();
+      sizzleAudio.pause();
+      sizzleAudio.currentTime = 0;
       soundEnabled = false;
       soundButton.textContent = "🔊 소리 켜기";
       localStorage.setItem("campfireSoundEnabled", "false");
@@ -1167,6 +1213,21 @@
       toast.classList.add("show");
     }
 
+    function playOneShot(audio) {
+      if (!soundEnabled) return;
+
+      try {
+        audio.pause();
+        audio.currentTime = 0;
+        const playPromise = audio.play();
+        if (playPromise) {
+          playPromise.catch(error => console.warn("효과음 재생 실패:", error));
+        }
+      } catch (error) {
+        console.warn("효과음 재생 실패:", error);
+      }
+    }
+
     function addWood(byUser = true) {
       state.wood += 1;
       localStorage.setItem("campfireWood", String(state.wood));
@@ -1174,6 +1235,7 @@
       createEmberBurst();
 
       if (byUser) {
+        playOneShot(woodThrowAudio);
         showToast("장작을 넣었습니다. 불이 조금 커졌어요.");
       }
     }
@@ -1258,6 +1320,13 @@
       marshmallowButton.disabled = true;
       marshmallowStick.classList.add("active");
 
+      if (soundEnabled) {
+        sizzleAudio.pause();
+        sizzleAudio.currentTime = 0;
+        sizzleAudio.loop = true;
+        sizzleAudio.play().catch(error => console.warn("굽기 효과음 재생 실패:", error));
+      }
+
       let remaining = 5;
       marshmallowButton.textContent = `🍡 굽는 중 ${remaining}초`;
 
@@ -1270,6 +1339,9 @@
 
       setTimeout(() => {
         clearInterval(countdown);
+        sizzleAudio.pause();
+        sizzleAudio.currentTime = 0;
+        sizzleAudio.loop = false;
         marshmallowStick.classList.remove("active");
         launchMarshmallowBurst();
         spamMarshmallowChats();
@@ -1373,7 +1445,11 @@
     }
 
     logButton.addEventListener("click", () => addWood(true));
-    soundButton.addEventListener("click", toggleAmbientSound);
+    soundButton.addEventListener("click", event => {
+      event.preventDefault();
+      event.stopPropagation();
+      toggleAmbientSound();
+    });
     marshmallowButton.addEventListener("click", roastMarshmallow);
     sendButton.addEventListener("click", sendMessage);
     chatInput.addEventListener("keydown", event => {
