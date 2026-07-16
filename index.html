@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>온라인 모닥불</title>
   <style>
     :root {
@@ -579,35 +579,176 @@
     }
 
     @media (max-width: 720px) {
+      html,
+      body {
+        min-height: 100%;
+        height: 100dvh;
+      }
+
+      .scene {
+        min-height: 100dvh;
+      }
+
       .header {
-        top: 14px;
-        left: 14px;
-        max-width: calc(100% - 28px);
+        top: max(10px, env(safe-area-inset-top));
+        left: 12px;
+        right: 12px;
+        width: auto;
+        padding: 11px 13px;
+        border-radius: 15px;
+      }
+
+      .title {
+        font-size: 16px;
+      }
+
+      .header .subtitle {
+        margin-top: 4px;
+        font-size: 11px;
       }
 
       .status {
-        top: auto;
-        bottom: 106px;
-        right: 14px;
-        min-width: 145px;
+        top: calc(max(10px, env(safe-area-inset-top)) + 70px);
+        left: 12px;
+        right: 12px;
+        bottom: auto;
+        min-width: 0;
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 6px 10px;
+        padding: 10px 12px;
+        border-radius: 15px;
+      }
+
+      .status-row {
+        display: block;
+        text-align: center;
+        font-size: 11px;
+      }
+
+      .status-row + .status-row {
+        margin-top: 0;
+      }
+
+      .status-row strong {
+        display: block;
+        margin-top: 3px;
+        font-size: 13px;
+      }
+
+      #locationStatus {
+        grid-column: 1 / -1;
+        margin-top: 1px;
+        text-align: center;
+        font-size: 10px;
+      }
+
+      .moon {
+        top: 20vh;
+        right: 7vw;
+        width: 58px;
       }
 
       .campfire-wrap {
-        bottom: 26vh;
-        transform: translateX(-50%) scale(.86);
+        bottom: 20vh;
+        width: 320px;
+        height: 310px;
+        transform: translateX(-50%) scale(.82);
+      }
+
+      .ground-shadow {
+        bottom: 16vh;
+        width: 92vw;
       }
 
       .controls {
+        left: 10px;
+        right: 10px;
+        bottom: max(10px, env(safe-area-inset-bottom));
+        width: auto;
         grid-template-columns: 1fr auto;
+        gap: 8px;
+        padding: 9px;
+        border-radius: 15px;
       }
 
       .log-button {
         grid-column: 1 / -1;
+        min-width: 0;
+        width: 100%;
+        padding: 11px 14px;
+      }
+
+      .chat-input,
+      .send-button {
+        padding-top: 11px;
+        padding-bottom: 11px;
+      }
+
+      .send-button {
+        min-width: 66px;
+      }
+
+      .speech {
+        max-width: 72vw;
+        font-size: 13px;
+      }
+
+      .toast {
+        top: 154px;
+        max-width: calc(100% - 28px);
+        text-align: center;
+      }
+    }
+
+    @media (max-width: 420px) {
+      .campfire-wrap {
+        bottom: 22vh;
+        transform: translateX(-50%) scale(.72);
+      }
+
+      .person {
+        transform: scale(.9);
       }
 
       .moon {
-        width: 66px;
-        right: 10vw;
+        top: 22vh;
+        width: 50px;
+      }
+    }
+
+    @media (max-height: 700px) and (max-width: 720px) {
+      .header {
+        padding: 9px 11px;
+      }
+
+      .header .subtitle {
+        display: none;
+      }
+
+      .status {
+        top: calc(max(10px, env(safe-area-inset-top)) + 52px);
+        padding: 8px 10px;
+      }
+
+      #locationStatus {
+        display: none;
+      }
+
+      .campfire-wrap {
+        bottom: 20vh;
+        transform: translateX(-50%) scale(.66);
+      }
+
+      .controls {
+        padding: 8px;
+      }
+
+      .log-button,
+      .chat-input,
+      .send-button {
+        padding-top: 9px;
+        padding-bottom: 9px;
       }
     }
   </style>
