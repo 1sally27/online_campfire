@@ -320,7 +320,7 @@
       position: absolute;
       left: 50%;
       bottom: 0;
-      border-radius: 55% 45% 60% 40% / 65% 58% 42% 35%;
+      border-radius: 50% 50% 44% 44% / 72% 72% 32% 32%;
       transform-origin: 50% 100%;
       animation: flicker .85s ease-in-out infinite alternate;
     }
@@ -328,7 +328,7 @@
     .flame.outer {
       width: 120px;
       height: 165px;
-      transform: translateX(-50%) rotate(45deg);
+      transform: translateX(-50%);
       background: linear-gradient(135deg, #ff6a2f 0%, #ff9d39 60%, #ffd06f 100%);
       opacity: .96;
     }
@@ -336,7 +336,7 @@
     .flame.mid {
       width: 82px;
       height: 122px;
-      transform: translateX(-50%) rotate(45deg);
+      transform: translateX(-50%);
       background: linear-gradient(135deg, #ffac3f 0%, #ffd76a 58%, #fff2a9 100%);
       animation-duration: .65s;
     }
@@ -344,7 +344,7 @@
     .flame.inner {
       width: 46px;
       height: 74px;
-      transform: translateX(-50%) rotate(45deg);
+      transform: translateX(-50%);
       background: linear-gradient(135deg, #fff1a8, #fff9d2);
       animation-duration: .5s;
     }
@@ -361,8 +361,8 @@
     }
 
     @keyframes flicker {
-      0% { transform: translateX(-50%) rotate(45deg) scaleX(.92) scaleY(.98); }
-      100% { transform: translateX(-50%) rotate(42deg) scaleX(1.05) scaleY(1.06); }
+      0% { transform: translateX(-50%) translateX(-2px) scaleX(.92) scaleY(.98); }
+      100% { transform: translateX(-50%) translateX(2px) scaleX(1.05) scaleY(1.06); }
     }
 
     @keyframes emberFly {
@@ -613,8 +613,8 @@
       z-index: 12;
       width: 185px;
       height: 18px;
-      transform: translateX(-8px) rotate(-18deg);
-      transform-origin: left center;
+      transform: translateX(-172px) rotate(18deg);
+      transform-origin: calc(100% - 14px) center;
       opacity: 0;
       pointer-events: none;
     }
@@ -655,8 +655,8 @@
     }
 
     @keyframes roastStick {
-      from { transform: translateX(-8px) rotate(-20deg); }
-      to { transform: translateX(-8px) rotate(-15deg); }
+      from { transform: translateX(-172px) rotate(15deg); }
+      to { transform: translateX(-172px) rotate(21deg); }
     }
 
     .marshmallow-burst {
@@ -676,7 +676,7 @@
       border-radius: 8px;
       background: linear-gradient(to bottom, #fffdf8, #f3d9c7);
       box-shadow: inset 0 -4px 0 rgba(126, 78, 46, .10), 0 4px 10px rgba(0,0,0,.18);
-      animation: marshmallowPop 1.5s cubic-bezier(.12,.72,.22,1) forwards;
+      animation: marshmallowPop var(--burst-duration, 1.5s) cubic-bezier(.12,.72,.22,1) forwards;
     }
 
     @keyframes marshmallowPop {
@@ -1274,6 +1274,12 @@
     }
 
 
+    // 마시멜로 폭죽 조절값
+    // 숫자가 작을수록 더 빠르게 퍼집니다.
+    const MARSHMALLOW_BURST_DURATION = 2.0;
+    // 전체 크기 배율입니다. 1은 기본, 1.5는 1.5배입니다.
+    const MARSHMALLOW_BURST_SIZE = 1.5;
+
     function launchMarshmallowBurst() {
       const burst = document.createElement("div");
       burst.className = "marshmallow-burst";
@@ -1287,13 +1293,14 @@
         const distance = 120 + Math.random() * Math.max(window.innerWidth, window.innerHeight) * 0.72;
         const mx = Math.cos(angle) * distance;
         const my = Math.sin(angle) * distance;
-        const scale = 0.7 + Math.random() * 1.2;
+        const scale = (0.7 + Math.random() * 1.2) * MARSHMALLOW_BURST_SIZE;
         const rotate = (-360 + Math.random() * 720) + "deg";
 
         piece.style.setProperty("--mx", mx + "px");
         piece.style.setProperty("--my", my + "px");
         piece.style.setProperty("--ms", scale.toFixed(2));
         piece.style.setProperty("--mr", rotate);
+        piece.style.setProperty("--burst-duration", MARSHMALLOW_BURST_DURATION + "s");
         piece.style.animationDelay = (Math.random() * 0.28).toFixed(2) + "s";
 
         burst.appendChild(piece);
