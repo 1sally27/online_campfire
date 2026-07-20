@@ -866,8 +866,10 @@
       }
 
       .speech {
-        max-width: 72vw;
+        max-width: 42vw;
+        min-width: 58px;
         font-size: 13px;
+        text-align: center;
       }
 
       .toast {
@@ -1249,7 +1251,7 @@
       }
     }
 
-    function addSpeech(text, isUser = false) {
+    function addSpeech(text, isUser = false, useFullScreen = false) {
       const clean = text.trim();
       if (!clean) return;
 
@@ -1257,13 +1259,48 @@
       bubble.className = "speech";
       bubble.textContent = clean;
 
-      const centerX = window.innerWidth / 2;
-      const spread = Math.min(window.innerWidth * 0.36, 380);
-      const x = centerX - spread / 2 + Math.random() * spread;
-      const y = window.innerHeight * (0.42 + Math.random() * 0.18);
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      const sideMargin = viewportWidth <= 720 ? 12 : 24;
 
-      bubble.style.left = Math.max(14, Math.min(window.innerWidth - 260, x)) + "px";
-      bubble.style.top = y + "px";
+      if (useFullScreen) {
+        // 마시멜로 완료 채팅은 모바일에서도 화면 전체 폭에 고르게 배치
+        const estimatedBubbleWidth = Math.min(
+          viewportWidth <= 720 ? viewportWidth * 0.42 : 220,
+          220
+        );
+        const availableWidth = Math.max(
+          0,
+          viewportWidth - estimatedBubbleWidth - sideMargin * 2
+        );
+
+        const x = sideMargin + Math.random() * availableWidth;
+
+        // 상단 정보창과 하단 조작창을 피해 화면 전반에 분산
+        const minY = viewportWidth <= 720
+          ? Math.max(190, viewportHeight * 0.24)
+          : viewportHeight * 0.25;
+        const maxY = viewportWidth <= 720
+          ? Math.max(minY + 80, viewportHeight - 230)
+          : viewportHeight * 0.68;
+
+        const y = minY + Math.random() * Math.max(80, maxY - minY);
+
+        bubble.style.left = x + "px";
+        bubble.style.top = y + "px";
+      } else {
+        // 일반 채팅은 모닥불 주변에 표시
+        const centerX = viewportWidth / 2;
+        const spread = Math.min(viewportWidth * 0.36, 380);
+        const x = centerX - spread / 2 + Math.random() * spread;
+        const y = viewportHeight * (0.42 + Math.random() * 0.18);
+
+        bubble.style.left = Math.max(
+          sideMargin,
+          Math.min(viewportWidth - 260, x)
+        ) + "px";
+        bubble.style.top = y + "px";
+      }
 
       if (isUser) {
         bubble.style.background = "rgba(255, 232, 188, .97)";
@@ -1315,7 +1352,7 @@
       for (let i = 0; i < 18; i++) {
         setTimeout(() => {
           const message = messages[Math.floor(Math.random() * messages.length)];
-          addSpeech(message);
+          addSpeech(message, false, true);
         }, i * 120);
       }
     }
