@@ -968,7 +968,7 @@
       <source src="freesound_community-punch-boxing-02wav-14897.mp3" type="audio/mpeg" />
     </audio>
     <audio id="sizzleAudio" preload="auto">
-      <source src="freesound_community-sizzle-104894.mp3" type="audio/mpeg" />
+      <source src="freesound_community-sizzle-104894.mp3?v=2" type="audio/mpeg" />
     </audio>
 
     <div class="toast" id="toast">장작을 넣었습니다.</div>
@@ -1108,12 +1108,24 @@
         campfireAudio.currentTime = 0;
         cricketsAudio.currentTime = 0;
 
+        // 모바일 브라우저에서 마시멜로 효과음도 사용자 클릭으로 미리 허용해 둡니다.
+        sizzleAudio.pause();
+        sizzleAudio.currentTime = 0;
+        sizzleAudio.loop = false;
+        sizzleAudio.muted = true;
+
         const results = await Promise.allSettled([
           campfireAudio.play(),
-          cricketsAudio.play()
+          cricketsAudio.play(),
+          sizzleAudio.play()
         ]);
 
-        const playedCount = results.filter(result => result.status === "fulfilled").length;
+        sizzleAudio.pause();
+        sizzleAudio.currentTime = 0;
+        sizzleAudio.muted = false;
+
+        const ambientResults = results.slice(0, 2);
+        const playedCount = ambientResults.filter(result => result.status === "fulfilled").length;
 
         if (playedCount === 0) {
           throw new Error("두 오디오 파일 모두 재생하지 못했습니다.");
@@ -1132,8 +1144,12 @@
         cricketsAudio.pause();
         soundEnabled = false;
         soundButton.textContent = "🔊 소리 켜기";
-        showToast("음원을 찾지 못했습니다. index.html과 mp3 두 파일을 같은 폴더에 올려 주세요.");
+        showToast("음원을 찾지 못했습니다. index.html과 mp3 파일을 같은 폴더에 올려 주세요.");
       } finally {
+        sizzleAudio.pause();
+        sizzleAudio.currentTime = 0;
+        sizzleAudio.muted = false;
+        sizzleAudio.loop = false;
         soundButton.disabled = false;
       }
     }
@@ -1406,8 +1422,16 @@
       if (soundEnabled) {
         sizzleAudio.pause();
         sizzleAudio.currentTime = 0;
+        sizzleAudio.muted = false;
         sizzleAudio.loop = true;
-        sizzleAudio.play().catch(error => console.warn("굽기 효과음 재생 실패:", error));
+
+        const sizzlePromise = sizzleAudio.play();
+        if (sizzlePromise) {
+          sizzlePromise.catch(error => {
+            console.warn("굽기 효과음 재생 실패:", error);
+            showToast("마시멜로 굽는 소리를 재생하지 못했습니다. 페이지를 새로고침해 주세요.");
+          });
+        }
       }
 
       let remaining = 5;
