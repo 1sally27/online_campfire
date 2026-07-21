@@ -951,7 +951,7 @@
 
     <aside class="status">
       <div class="status-row"><span>장작</span><strong id="woodCount">1개</strong></div>
-      <div class="status-row"><span>함께 있는 사람</span><strong id="peopleCount">3명</strong></div>
+      <div class="status-row"><span>함께 있는 사람</span><strong id="peopleCount">0명</strong></div>
       <div class="status-row"><span>날씨</span><strong id="weatherText">위치 확인 중</strong></div>
       <div class="subtitle" id="locationStatus">위치 권한을 허용해 주세요.</div>
     </aside>
@@ -1019,7 +1019,42 @@
     </section>
   </main>
 
-  <script>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js";
+    import {
+      getAuth,
+      onAuthStateChanged,
+      signInAnonymously
+    } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
+    import {
+      getDatabase,
+      limitToLast,
+      onChildAdded,
+      onDisconnect,
+      onValue,
+      push,
+      query,
+      ref,
+      runTransaction,
+      serverTimestamp,
+      set,
+      update
+    } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-database.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyDtzKr_yaxWc0OLjc1mqOZrshNGw-fJQBA",
+      authDomain: "online-campfire.firebaseapp.com",
+      databaseURL: "https://online-campfire-default-rtdb.firebaseio.com",
+      projectId: "online-campfire",
+      storageBucket: "online-campfire.firebasestorage.app",
+      messagingSenderId: "867517557735",
+      appId: "1:867517557735:web:cedd443ba5752640176b42"
+    };
+
+    const firebaseApp = initializeApp(firebaseConfig);
+    const auth = getAuth(firebaseApp);
+    const database = getDatabase(firebaseApp);
+
     const scene = document.getElementById("scene");
     const stars = document.getElementById("stars");
     const rain = document.getElementById("rain");
@@ -1043,26 +1078,22 @@
     const sizzleAudio = document.getElementById("sizzleAudio");
 
     const state = {
-      wood: Number(localStorage.getItem("campfireWood") || 1),
+      wood: 1,
       rainy: false,
-      people: 3,
+      people: 0,
       roastingMarshmallow: false
     };
 
-    const idleMessages = [
-      "퇴근하고 싶다",
-      "불 좋다",
-      "다들 오늘도 버텨요",
-      "조용해서 좋네",
-      "장작 하나 놓고 갑니다",
-      "커피 마시는 중",
-      "오늘은 좀 춥다",
-      "불멍 중",
-      "아무 말 없이 있다 갈게요",
-      "퇴근까지 조금만 더"
-    ];
-
     let soundEnabled = false;
+    let firebaseReady = false;
+    let currentUser = null;
+    let initializedUid = null;
+    let myConnectionRef = null;
+    let myConnectionPath = "";
+    let isDecayLeader = false;
+    let anyoneRainy = false;
+    let lastWoodValue = null;
+    const messageListenerStartedAt = Date.now();
 
     campfireAudio.volume = 0.58;
     cricketsAudio.volume = 0.22;
@@ -1182,7 +1213,7 @@
       } else if (current > wanted) {
         [...logs.querySelectorAll(".extra-log")]
           .slice(wanted)
-          .forEach(el => el.remove());
+          .forEach(element => element.remove());
       }
     }
 
@@ -1231,29 +1262,45 @@
       }
     }
 
-    function addWood(byUser = true) {
-      state.wood += 1;
-      localStorage.setItem("campfireWood", String(state.wood));
-      renderFire();
-      createEmberBurst();
+    async function addWood(byUser = true) {
+      if (!firebaseReady || !currentUser) {
+        showToast("실시간 모닥불에 연결 중입니다. 잠시 후 다시 눌러 주세요.");
+        return;
+      }
 
-      if (byUser) {
-        playOneShot(woodThrowAudio);
-        showToast("장작을 넣었습니다. 불이 조금 커졌어요.");
+      try {
+        await runTransaction(ref(database, "campfire/wood"), currentWood => {
+          const wood = Number(currentWood);
+          if (!Number.isFinite(wood) || wood < 1) return 2;
+          return Math.min(1000000, wood + 1);
+        });
+
+        if (byUser) {
+          playOneShot(woodThrowAudio);
+          showToast("장작을 넣었습니다. 불이 조금 커졌어요.");
+        }
+      } catch (error) {
+        console.error("장작 추가 실패:", error);
+        showToast("장작을 넣지 못했습니다.");
       }
     }
 
-    function weakenFire(amount = 1) {
-      const before = state.wood;
-      state.wood = Math.max(1, state.wood - amount);
-      if (state.wood !== before) {
-        localStorage.setItem("campfireWood", String(state.wood));
-        renderFire();
+    async function weakenFire(amount = 1) {
+      if (!firebaseReady || !currentUser) return;
+
+      try {
+        await runTransaction(ref(database, "campfire/wood"), currentWood => {
+          const wood = Number(currentWood);
+          if (!Number.isFinite(wood)) return 1;
+          return Math.max(1, wood - amount);
+        });
+      } catch (error) {
+        console.error("불 약화 실패:", error);
       }
     }
 
     function addSpeech(text, isUser = false, useFullScreen = false) {
-      const clean = text.trim();
+      const clean = String(text || "").trim();
       if (!clean) return;
 
       const bubble = document.createElement("div");
@@ -1265,7 +1312,6 @@
       const sideMargin = viewportWidth <= 720 ? 12 : 24;
 
       if (useFullScreen) {
-        // 마시멜로 완료 채팅은 모바일에서도 화면 전체 폭에 고르게 배치
         const estimatedBubbleWidth = Math.min(
           viewportWidth <= 720 ? viewportWidth * 0.42 : 220,
           220
@@ -1276,21 +1322,17 @@
         );
 
         const x = sideMargin + Math.random() * availableWidth;
-
-        // 상단 정보창과 하단 조작창을 피해 화면 전반에 분산
         const minY = viewportWidth <= 720
           ? Math.max(190, viewportHeight * 0.24)
           : viewportHeight * 0.25;
         const maxY = viewportWidth <= 720
           ? Math.max(minY + 80, viewportHeight - 230)
           : viewportHeight * 0.68;
-
         const y = minY + Math.random() * Math.max(80, maxY - minY);
 
         bubble.style.left = x + "px";
         bubble.style.top = y + "px";
       } else {
-        // 일반 채팅은 모닥불 주변에 표시
         const centerX = viewportWidth / 2;
         const spread = Math.min(viewportWidth * 0.36, 380);
         const x = centerX - spread / 2 + Math.random() * spread;
@@ -1311,11 +1353,7 @@
       setTimeout(() => bubble.remove(), 6200);
     }
 
-
-    // 마시멜로 폭죽 조절값
-    // 숫자가 작을수록 더 빠르게 퍼집니다.
     const MARSHMALLOW_BURST_DURATION = 3.0;
-    // 전체 크기 배율입니다. 1은 기본, 1.5는 1.5배입니다.
     const MARSHMALLOW_BURST_SIZE = 2.0;
 
     function launchMarshmallowBurst() {
@@ -1344,7 +1382,7 @@
         burst.appendChild(piece);
       }
 
-      setTimeout(() => burst.remove(), 1900);
+      setTimeout(() => burst.remove(), (MARSHMALLOW_BURST_DURATION + 0.5) * 1000);
     }
 
     function spamMarshmallowChats() {
@@ -1396,12 +1434,39 @@
       }, 5000);
     }
 
-    function sendMessage() {
+    async function sendMessage() {
       const text = chatInput.value.trim();
       if (!text) return;
-      addSpeech(text, true);
+
+      if (!firebaseReady || !currentUser) {
+        showToast("실시간 채팅에 연결 중입니다. 잠시 후 다시 보내 주세요.");
+        return;
+      }
+
       chatInput.value = "";
-      chatInput.focus();
+
+      try {
+        await push(ref(database, "messages"), {
+          text,
+          uid: currentUser.uid,
+          createdAt: serverTimestamp(),
+          clientCreatedAt: Date.now()
+        });
+        chatInput.focus();
+      } catch (error) {
+        console.error("메시지 전송 실패:", error);
+        chatInput.value = text;
+        showToast("메시지를 보내지 못했습니다.");
+      }
+    }
+
+    async function syncPresenceWeather() {
+      if (!myConnectionRef) return;
+      try {
+        await update(myConnectionRef, { rainy: state.rainy });
+      } catch (error) {
+        console.warn("접속 날씨 상태 갱신 실패:", error);
+      }
     }
 
     function setRain(nextRainy, label = nextRainy ? "비" : "맑음") {
@@ -1410,6 +1475,7 @@
       scene.classList.toggle("rainy", state.rainy);
       rain.classList.toggle("active", state.rainy);
       weatherText.textContent = label;
+      syncPresenceWeather();
 
       if (changed && state.rainy) {
         showToast("현재 위치에 비가 와서 불이 더 빨리 약해집니다.");
@@ -1489,6 +1555,147 @@
       );
     }
 
+    function listenToSharedWood() {
+      const woodRef = ref(database, "campfire/wood");
+
+      runTransaction(woodRef, currentWood => {
+        const wood = Number(currentWood);
+        return Number.isFinite(wood) && wood >= 1 ? wood : 1;
+      }).catch(error => console.error("장작 초기화 실패:", error));
+
+      onValue(woodRef, snapshot => {
+        const wood = Number(snapshot.val());
+        const nextWood = Number.isFinite(wood) && wood >= 1 ? wood : 1;
+
+        if (lastWoodValue !== null && nextWood > lastWoodValue) {
+          createEmberBurst();
+        }
+
+        lastWoodValue = nextWood;
+        state.wood = nextWood;
+        renderFire();
+      }, error => {
+        console.error("장작 동기화 실패:", error);
+        showToast("장작 상태를 불러오지 못했습니다.");
+      });
+    }
+
+    function listenToPresence() {
+      onValue(ref(database, "presence"), snapshot => {
+        let connectionCount = 0;
+        let hasRainyConnection = false;
+        const connectionPaths = [];
+
+        snapshot.forEach(userSnapshot => {
+          userSnapshot.forEach(connectionSnapshot => {
+            connectionCount += 1;
+            connectionPaths.push(`${userSnapshot.key}/${connectionSnapshot.key}`);
+            if (connectionSnapshot.val()?.rainy === true) {
+              hasRainyConnection = true;
+            }
+          });
+        });
+
+        connectionPaths.sort();
+        state.people = connectionCount;
+        anyoneRainy = hasRainyConnection;
+        isDecayLeader = Boolean(
+          myConnectionPath && connectionPaths[0] === myConnectionPath
+        );
+        peopleCountEl.textContent = `${state.people}명`;
+      }, error => {
+        console.error("접속자 수 동기화 실패:", error);
+      });
+    }
+
+    function registerPresence(user) {
+      const connectedRef = ref(database, ".info/connected");
+
+      onValue(connectedRef, async snapshot => {
+        if (snapshot.val() !== true) {
+          myConnectionRef = null;
+          myConnectionPath = "";
+          isDecayLeader = false;
+          return;
+        }
+
+        try {
+          const userConnectionsRef = ref(database, `presence/${user.uid}`);
+          const connectionRef = push(userConnectionsRef);
+
+          await onDisconnect(connectionRef).remove();
+
+          myConnectionRef = connectionRef;
+          myConnectionPath = `${user.uid}/${connectionRef.key}`;
+
+          await set(connectionRef, {
+            connectedAt: serverTimestamp(),
+            rainy: state.rainy
+          });
+        } catch (error) {
+          console.error("접속 상태 등록 실패:", error);
+          showToast("접속자 상태를 등록하지 못했습니다.");
+        }
+      });
+    }
+
+    function listenToMessages(user) {
+      const recentMessages = query(
+        ref(database, "messages"),
+        limitToLast(50)
+      );
+
+      onChildAdded(recentMessages, snapshot => {
+        const message = snapshot.val();
+        if (!message || typeof message.text !== "string") return;
+
+        const clientCreatedAt = Number(message.clientCreatedAt || 0);
+        if (!Number.isFinite(clientCreatedAt)) return;
+
+        if (clientCreatedAt < messageListenerStartedAt - 5000) {
+          return;
+        }
+
+        addSpeech(message.text, message.uid === user.uid);
+      }, error => {
+        console.error("채팅 수신 실패:", error);
+      });
+    }
+
+    function initializeRealtimeCampfire(user) {
+      if (initializedUid === user.uid) return;
+
+      initializedUid = user.uid;
+      currentUser = user;
+      firebaseReady = true;
+
+      listenToSharedWood();
+      listenToPresence();
+      registerPresence(user);
+      listenToMessages(user);
+      showToast("실시간 모닥불에 연결되었습니다.");
+    }
+
+    function startFirebase() {
+      onAuthStateChanged(auth, user => {
+        if (user) {
+          initializeRealtimeCampfire(user);
+        }
+      });
+
+      if (!auth.currentUser) {
+        signInAnonymously(auth).catch(error => {
+          console.error("Firebase 익명 로그인 실패:", error);
+          firebaseReady = false;
+          showToast("실시간 서버에 연결하지 못했습니다.");
+
+          if (error.code === "auth/operation-not-allowed") {
+            console.error("Firebase Authentication에서 익명 로그인을 사용 설정해야 합니다.");
+          }
+        });
+      }
+    }
+
     logButton.addEventListener("click", () => addWood(true));
     soundButton.addEventListener("click", event => {
       event.preventDefault();
@@ -1505,23 +1712,15 @@
     createRain();
     renderFire();
     startLocationWeather();
+    startFirebase();
 
     setInterval(() => {
-      if (Math.random() < 0.72) {
-        addSpeech(idleMessages[Math.floor(Math.random() * idleMessages.length)]);
-      }
-    }, 5300);
+      if (!firebaseReady || !isDecayLeader) return;
 
-    setInterval(() => {
-      const change = Math.random();
-      if (change < 0.38) state.people = Math.min(18, state.people + 1);
-      else if (change < 0.72) state.people = Math.max(1, state.people - 1);
-      peopleCountEl.textContent = `${state.people}명`;
-    }, 9000);
-
-    setInterval(() => {
-      if (Math.random() < (state.rainy ? 0.72 : 0.22)) {
-        weakenFire(state.rainy ? 1 + Math.floor(Math.random() * 2) : 1);
+      const decayChance = anyoneRainy ? 0.72 : 0.22;
+      if (Math.random() < decayChance) {
+        const amount = anyoneRainy ? 1 + Math.floor(Math.random() * 2) : 1;
+        weakenFire(amount);
       }
     }, 7000);
 
