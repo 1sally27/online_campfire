@@ -1745,12 +1745,12 @@
     setInterval(() => {
       if (!firebaseReady || !isDecayLeader) return;
 
-      const decayChance = anyoneRainy ? 0.72 : 0.22;
+      const decayChance = anyoneRainy ? 0.80 : 0.40; // 비가 안 올 때, 매 확인마다 80% 확률, 누군가 있는 지역에 비가 올 때, 매 확인마다 40% 확률
       if (Math.random() < decayChance) {
         const amount = anyoneRainy ? 1 + Math.floor(Math.random() * 2) : 1;
         weakenFire(amount);
       }
-    }, 7000);
+    }, 5000); //5초마다 확인
 
     setTimeout(() => addSpeech("잠깐 쉬었다 가세요"), 900);
   </script>
