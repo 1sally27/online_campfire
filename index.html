@@ -1323,21 +1323,30 @@
       bubble.className = "speech";
       bubble.textContent = clean;
 
+      if (isUser) {
+        bubble.style.background = "rgba(255, 232, 188, .97)";
+      }
+
+      // 실제 말풍선 너비를 잰 뒤 배치해야 화면 중심이 정확히 맞습니다.
+      // 이전 코드는 모든 말풍선을 220px로 가정해서 짧은 문구가 왼쪽으로 치우쳤습니다.
+      bubble.style.visibility = "hidden";
+      speechLayer.appendChild(bubble);
+
       const viewportWidth = window.innerWidth;
       const viewportHeight = window.innerHeight;
       const sideMargin = viewportWidth <= 720 ? 12 : 24;
+      const bubbleWidth = Math.min(
+        bubble.offsetWidth,
+        Math.max(0, viewportWidth - sideMargin * 2)
+      );
 
       if (useFullScreen) {
-        const estimatedBubbleWidth = Math.min(
-          viewportWidth <= 720 ? viewportWidth * 0.42 : 220,
-          220
-        );
         const availableWidth = Math.max(
           0,
-          viewportWidth - estimatedBubbleWidth - sideMargin * 2
+          viewportWidth - bubbleWidth - sideMargin * 2
         );
-
         const x = sideMargin + Math.random() * availableWidth;
+
         const minY = viewportWidth <= 720
           ? Math.max(190, viewportHeight * 0.24)
           : viewportHeight * 0.25;
@@ -1352,22 +1361,20 @@
         const centerX = viewportWidth / 2;
         const spread = Math.min(viewportWidth * 0.36, 380);
         const x = centerX - spread / 2 + Math.random() * spread;
+        const maxLeft = Math.max(sideMargin, viewportWidth - bubbleWidth - sideMargin);
         const y = viewportHeight * (0.42 + Math.random() * 0.18);
 
         bubble.style.left = Math.max(
           sideMargin,
-          Math.min(viewportWidth - 260, x)
+          Math.min(maxLeft, x)
         ) + "px";
         bubble.style.top = y + "px";
       }
 
-      if (isUser) {
-        bubble.style.background = "rgba(255, 232, 188, .97)";
-      }
-
-      speechLayer.appendChild(bubble);
+      bubble.style.visibility = "visible";
       setTimeout(() => bubble.remove(), 6200);
     }
+
 // 마시멜로 폭죽 조절값
 
 // 숫자가 작을수록 더 빠르게 퍼짐
@@ -1745,7 +1752,7 @@
     setInterval(() => {
       if (!firebaseReady || !isDecayLeader) return;
 
-      const decayChance = anyoneRainy ? 0.80 : 0.40; // 비가 안 올 때, 매 확인마다 80% 확률, 누군가 있는 지역에 비가 올 때, 매 확인마다 40% 확률
+     const decayChance = anyoneRainy ? 0.80 : 0.40; // 비가 안 올 때, 매 확인마다 80% 확률, 누군가 있는 지역에 비가 올 때, 매 확인마다 40% 확률
       if (Math.random() < decayChance) {
         const amount = anyoneRainy ? 1 + Math.floor(Math.random() * 2) : 1;
         weakenFire(amount);
