@@ -1368,8 +1368,12 @@
       speechLayer.appendChild(bubble);
       setTimeout(() => bubble.remove(), 6200);
     }
+// 마시멜로 폭죽 조절값
 
-    const MARSHMALLOW_BURST_DURATION = 3.0;
+// 숫자가 작을수록 더 빠르게 퍼짐
+    const MARSHMALLOW_BURST_DURATION = 3.5;
+
+// 숫자가 클수록 마시멜로 입자가 커짐
     const MARSHMALLOW_BURST_SIZE = 2.0;
 
     function launchMarshmallowBurst() {
